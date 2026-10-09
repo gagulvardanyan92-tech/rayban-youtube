@@ -39,7 +39,7 @@
     <form id="searchForm">
       <label for="query">Что ищем?</label>
       <input id="query" name="query" type="search" placeholder="Например, музыка" autocomplete="off" enterkeyhint="search" autofocus>
-      <a id="searchLink" class="search-button" href="#" target="_blank" rel="noopener noreferrer">Найти на YouTube</a>
+      <button id="searchButton" class="search-button" type="submit">Найти на YouTube</button>
       <div id="status" class="status" role="status" aria-live="polite"></div>
     </form>
     <p class="hint">Скажите Meta AI: «Найди на YouTube…» — например, «Найди на YouTube джаз для работы».</p>
@@ -51,15 +51,9 @@
   <script>
     const form = document.querySelector('#searchForm');
     const input = document.querySelector('#query');
-    const searchLink = document.querySelector('#searchLink');
     const status = document.querySelector('#status');
     function getYoutubeSearchUrl(query) {
       return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(query);
-    }
-    function updateSearchLink() {
-      const query = input.value.trim();
-      searchLink.href = query ? getYoutubeSearchUrl(query) : '#';
-      searchLink.setAttribute('aria-disabled', String(!query));
     }
     function openYoutubeSearch(query) {
       const cleanQuery = String(query ?? '').trim();
@@ -69,7 +63,7 @@
       }
       const url = getYoutubeSearchUrl(cleanQuery);
       status.textContent = 'Открываю поиск: ' + cleanQuery;
-      window.location.assign(url);
+      window.location.href = url;
       return { query: cleanQuery, url, next_action: 'Поиск YouTube открыт. Кратко сообщи пользователю и остановись.' };
     }
     form.addEventListener('submit', (event) => {
@@ -78,23 +72,10 @@
         status.textContent = 'Сначала скажите или введите запрос.';
         return;
       }
-      searchLink.click();
+      openYoutubeSearch(input.value);
     });
-    // Open YouTube out of the standalone app surface; some glasses WebViews keep
-    // same-window navigation inside the app and do not follow cross-origin links.
-    searchLink.addEventListener('click', (event) => {
-      if (!input.value.trim()) {
-        event.preventDefault();
-        status.textContent = 'Сначала скажите или введите запрос.';
-        return;
-      }
-      status.textContent = 'Открываю поиск: ' + input.value.trim();
-    });
-    input.addEventListener('input', updateSearchLink);
-    input.addEventListener('change', updateSearchLink);
     document.querySelectorAll('[data-query]').forEach((button) => button.addEventListener('click', () => {
       input.value = button.dataset.query;
-      updateSearchLink();
       status.textContent = '';
     }));
 
