@@ -39,7 +39,7 @@
     <form id="searchForm">
       <label for="query">Что ищем?</label>
       <input id="query" name="query" type="search" placeholder="Например, музыка" autocomplete="off" enterkeyhint="search" autofocus>
-      <a id="searchLink" class="search-button" href="#">Найти на YouTube</a>
+      <a id="searchLink" class="search-button" href="#" target="_blank" rel="noopener noreferrer">Найти на YouTube</a>
       <div id="status" class="status" role="status" aria-live="polite"></div>
     </form>
     <p class="hint">Скажите Meta AI: «Найди на YouTube…» — например, «Найди на YouTube джаз для работы».</p>
@@ -80,7 +80,8 @@
       }
       searchLink.click();
     });
-    // A native link gives the glasses WebView a direct, keyboard-activatable navigation target.
+    // Open YouTube out of the standalone app surface; some glasses WebViews keep
+    // same-window navigation inside the app and do not follow cross-origin links.
     searchLink.addEventListener('click', (event) => {
       if (!input.value.trim()) {
         event.preventDefault();
