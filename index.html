@@ -20,6 +20,7 @@
     input { width: 100%; min-height: 60px; border: 2px solid #777; border-radius: 14px; background: #151515; color: white; padding: 12px 16px; font-size: 21px; outline: none; }
     input:focus { border-color: #fff; }
     button { min-height: 62px; margin-top: 14px; border: 0; border-radius: 14px; padding: 12px 18px; color: #fff; background: #f22; font-size: 21px; font-weight: 700; cursor: pointer; }
+    .search-button { display: grid; place-items: center; width: 100%; min-height: 62px; margin-top: 14px; border-radius: 14px; padding: 12px 18px; color: #fff; background: #f22; font-size: 21px; font-weight: 700; text-decoration: none; }
     button:focus-visible, a:focus-visible { outline: 3px solid #fff; outline-offset: 4px; }
     .hint { color: #aaa; font-size: 15px; line-height: 1.45; margin-top: 22px; }
     .status { min-height: 26px; color: #ffb3b3; font-size: 15px; margin-top: 12px; }
@@ -38,7 +39,7 @@
     <form id="searchForm">
       <label for="query">Что ищем?</label>
       <input id="query" name="query" type="search" placeholder="Например, музыка" autocomplete="off" enterkeyhint="search" autofocus>
-      <button type="submit">Найти на YouTube</button>
+      <a id="searchLink" class="search-button" href="#">Найти на YouTube</a>
       <div id="status" class="status" role="status" aria-live="polite"></div>
     </form>
     <p class="hint">Скажите Meta AI: «Найди на YouTube…» — например, «Найди на YouTube джаз для работы».</p>
@@ -50,28 +51,51 @@
   <script>
     const form = document.querySelector('#searchForm');
     const input = document.querySelector('#query');
+    const searchLink = document.querySelector('#searchLink');
     const status = document.querySelector('#status');
+    function getYoutubeSearchUrl(query) {
+      return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(query);
+    }
+    function updateSearchLink() {
+      const query = input.value.trim();
+      searchLink.href = query ? getYoutubeSearchUrl(query) : '#';
+      searchLink.setAttribute('aria-disabled', String(!query));
+    }
     function openYoutubeSearch(query) {
       const cleanQuery = String(query ?? '').trim();
-      if (!cleanQuery) return { error: true, message: 'Не получил поисковый запрос.', next_action: 'Попроси пользователя назвать, что найти на YouTube.' };
-      const url = 'https://www.youtube.com/results?search_query=' + encodeURIComponent(cleanQuery);
-      input.value = cleanQuery;
+      if (!cleanQuery) {
+        status.textContent = 'Сначала скажите или введите запрос.';
+        return { error: true, message: 'Не получил поисковый запрос.', next_action: 'Попроси пользователя назвать, что найти на YouTube.' };
+      }
+      const url = getYoutubeSearchUrl(cleanQuery);
       status.textContent = 'Открываю поиск: ' + cleanQuery;
-      window.location.href = url;
+      window.location.assign(url);
       return { query: cleanQuery, url, next_action: 'Поиск YouTube открыт. Кратко сообщи пользователю и остановись.' };
     }
     form.addEventListener('submit', (event) => {
       event.preventDefault();
-      const query = input.value.trim();
-      if (!query) { status.textContent = 'Введите запрос для поиска.'; input.focus(); return; }
-      // Open the regular YouTube results page; playback and login remain under YouTube's control.
-      openYoutubeSearch(query);
+      if (!input.value.trim()) {
+        status.textContent = 'Сначала скажите или введите запрос.';
+        return;
+      }
+      searchLink.click();
     });
+    // A native link gives the glasses WebView a direct, keyboard-activatable navigation target.
+    searchLink.addEventListener('click', (event) => {
+      if (!input.value.trim()) {
+        event.preventDefault();
+        status.textContent = 'Сначала скажите или введите запрос.';
+        return;
+      }
+      status.textContent = 'Открываю поиск: ' + input.value.trim();
+    });
+    input.addEventListener('input', updateSearchLink);
+    input.addEventListener('change', updateSearchLink);
     document.querySelectorAll('[data-query]').forEach((button) => button.addEventListener('click', () => {
       input.value = button.dataset.query;
-      form.requestSubmit();
+      updateSearchLink();
+      status.textContent = '';
     }));
-    input.addEventListener('input', () => { status.textContent = ''; });
 
     // WebMCP lets Meta AI invoke this search by voice when the device/browser enables it.
     // Keep the app usable with its ordinary controls if WebMCP is unavailable.
