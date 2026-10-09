@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
   <meta name="theme-color" content="#050505">
+  <meta name="description" content="Голосовой поиск видео YouTube на Meta Ray-Ban Display. Когда пользователь просит найти видео на YouTube, вызови youtube_search_videos с его запросом.">
   <title>YouTube для Ray-Ban Display</title>
   <style>
     :root { color-scheme: dark; font-family: Arial, Helvetica, sans-serif; }
@@ -40,7 +41,7 @@
       <button type="submit">Найти на YouTube</button>
       <div id="status" class="status" role="status" aria-live="polite"></div>
     </form>
-    <p class="hint">Выберите поле, введите запрос голосом, рукописным вводом или клавиатурой очков, затем нажмите «Найти».</p>
+    <p class="hint">Скажите Meta AI: «Найди на YouTube…» — например, «Найди на YouTube джаз для работы».</p>
     <div class="quick" aria-label="Быстрый выбор">
       <button type="button" data-query="музыка">Музыка</button>
       <button type="button" data-query="новости">Новости</button>
@@ -50,18 +51,62 @@
     const form = document.querySelector('#searchForm');
     const input = document.querySelector('#query');
     const status = document.querySelector('#status');
+    function openYoutubeSearch(query) {
+      const cleanQuery = String(query ?? '').trim();
+      if (!cleanQuery) return { error: true, message: 'Не получил поисковый запрос.', next_action: 'Попроси пользователя назвать, что найти на YouTube.' };
+      const url = 'https://www.youtube.com/results?search_query=' + encodeURIComponent(cleanQuery);
+      input.value = cleanQuery;
+      status.textContent = 'Открываю поиск: ' + cleanQuery;
+      window.location.href = url;
+      return { query: cleanQuery, url, next_action: 'Поиск YouTube открыт. Кратко сообщи пользователю и остановись.' };
+    }
     form.addEventListener('submit', (event) => {
       event.preventDefault();
       const query = input.value.trim();
       if (!query) { status.textContent = 'Введите запрос для поиска.'; input.focus(); return; }
       // Open the regular YouTube results page; playback and login remain under YouTube's control.
-      window.location.href = 'https://www.youtube.com/results?search_query=' + encodeURIComponent(query);
+      openYoutubeSearch(query);
     });
     document.querySelectorAll('[data-query]').forEach((button) => button.addEventListener('click', () => {
       input.value = button.dataset.query;
       form.requestSubmit();
     }));
     input.addEventListener('input', () => { status.textContent = ''; });
+
+    // WebMCP lets Meta AI invoke this search by voice when the device/browser enables it.
+    // Keep the app usable with its ordinary controls if WebMCP is unavailable.
+    const modelContext = document.modelContext;
+    if (modelContext && typeof modelContext.registerTool === 'function') {
+      const registerSafely = (tool) => {
+        try {
+          const result = modelContext.registerTool(tool);
+          if (result && typeof result.then === 'function') {
+            result.then(undefined, (error) => console.error('WebMCP registration failed:', error));
+          }
+        } catch (error) {
+          console.error('WebMCP registration failed:', error);
+        }
+      };
+      registerSafely({
+        name: 'youtube_search_videos',
+        description: 'Открой поиск видео YouTube по запросу пользователя. Передай всю фразу, которую пользователь хочет найти.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            query: { type: 'string', description: 'Что искать на YouTube, например: джаз для работы.' }
+          },
+          required: ['query']
+        },
+        execute: async ({ query }) => openYoutubeSearch(query)
+      });
+      registerSafely({
+        name: 'youtube_search_status',
+        description: 'Проверь, что умеет приложение поиска YouTube.',
+        inputSchema: { type: 'object', properties: {} },
+        annotations: { readOnlyHint: true },
+        execute: async () => JSON.stringify({ capability: 'youtube_search', instruction: 'Когда пользователь просит найти видео, вызови youtube_search_videos с его запросом.' })
+      });
+    }
   </script>
 </body>
 </html>
