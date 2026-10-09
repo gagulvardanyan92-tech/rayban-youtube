@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <meta name="theme-color" content="#050505">
+  <title>YouTube для Ray-Ban Display</title>
+  <style>
+    :root { color-scheme: dark; font-family: Arial, Helvetica, sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; width: 100vw; min-height: 100vh; background: #050505; color: #fff; }
+    main { width: min(100vw, 600px); min-height: 100vh; margin: auto; padding: 34px 30px 28px; display: flex; flex-direction: column; }
+    header { display: flex; align-items: center; gap: 14px; margin-bottom: 28px; }
+    .logo { width: 46px; height: 32px; border-radius: 10px; background: #f22; display: grid; place-items: center; }
+    .play { width: 0; height: 0; border-top: 8px solid transparent; border-bottom: 8px solid transparent; border-left: 13px solid white; margin-left: 3px; }
+    h1 { font-size: 26px; line-height: 1.05; margin: 0; letter-spacing: .02em; }
+    .sub { color: #aaa; font-size: 15px; margin-top: 5px; }
+    label { font-size: 16px; color: #ddd; margin-bottom: 10px; }
+    input { width: 100%; min-height: 60px; border: 2px solid #777; border-radius: 14px; background: #151515; color: white; padding: 12px 16px; font-size: 21px; outline: none; }
+    input:focus { border-color: #fff; }
+    button { min-height: 62px; margin-top: 14px; border: 0; border-radius: 14px; padding: 12px 18px; color: #fff; background: #f22; font-size: 21px; font-weight: 700; cursor: pointer; }
+    button:focus-visible, a:focus-visible { outline: 3px solid #fff; outline-offset: 4px; }
+    .hint { color: #aaa; font-size: 15px; line-height: 1.45; margin-top: 22px; }
+    .status { min-height: 26px; color: #ffb3b3; font-size: 15px; margin-top: 12px; }
+    .quick { display: flex; gap: 10px; margin-top: auto; padding-top: 24px; }
+    .quick button { flex: 1; min-height: 54px; margin: 0; background: #262626; font-size: 16px; border: 2px solid #666; }
+    .quick button[aria-pressed="true"] { border-color: white; background: #3a3a3a; }
+    @media (min-width: 601px) { body { width: 600px; min-height: 600px; } main { width: 600px; min-height: 600px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header aria-label="YouTube">
+      <div class="logo" aria-hidden="true"><span class="play"></span></div>
+      <div><h1>YouTube</h1><div class="sub">поиск и запуск видео</div></div>
+    </header>
+    <form id="searchForm">
+      <label for="query">Что ищем?</label>
+      <input id="query" name="query" type="search" placeholder="Например, музыка" autocomplete="off" enterkeyhint="search" autofocus>
+      <button type="submit">Найти на YouTube</button>
+      <div id="status" class="status" role="status" aria-live="polite"></div>
+    </form>
+    <p class="hint">Выберите поле, введите запрос голосом, рукописным вводом или клавиатурой очков, затем нажмите «Найти».</p>
+    <div class="quick" aria-label="Быстрый выбор">
+      <button type="button" data-query="музыка">Музыка</button>
+      <button type="button" data-query="новости">Новости</button>
+    </div>
+  </main>
+  <script>
+    const form = document.querySelector('#searchForm');
+    const input = document.querySelector('#query');
+    const status = document.querySelector('#status');
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const query = input.value.trim();
+      if (!query) { status.textContent = 'Введите запрос для поиска.'; input.focus(); return; }
+      // Open the regular YouTube results page; playback and login remain under YouTube's control.
+      window.location.href = 'https://www.youtube.com/results?search_query=' + encodeURIComponent(query);
+    });
+    document.querySelectorAll('[data-query]').forEach((button) => button.addEventListener('click', () => {
+      input.value = button.dataset.query;
+      form.requestSubmit();
+    }));
+    input.addEventListener('input', () => { status.textContent = ''; });
+  </script>
+</body>
+</html>
