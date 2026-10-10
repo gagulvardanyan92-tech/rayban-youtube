@@ -36,10 +36,10 @@
     main.player-mode { position: fixed; inset: 0; z-index: 1000; width: 100vw; height: 100vh; min-height: 0; max-width: none; margin: 0; padding: 0; overflow: hidden; background: #000; }
     main.player-mode > header, main.player-mode > form, main.player-mode > .hint,
     main.player-mode > #resultsView, main.player-mode > .quick { display: none; }
-    main.player-mode > #playerView { position: absolute; inset: 0; display: flex; min-height: 0; flex-direction: column; justify-content: center; align-items: center; }
-    main.player-mode #playerFrame { flex: 0 1 auto; width: 100%; height: auto; max-height: calc(100% - 64px); min-height: 0; aspect-ratio: 16 / 9; margin: 0; }
+    main.player-mode > #playerView { position: absolute; inset: 0; display: block; min-height: 0; }
+    main.player-mode #playerFrame { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; aspect-ratio: auto; border-radius: 0; margin: 0; }
     main.player-mode #videoTitle { display: none; }
-    main.player-mode #backToResults { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); min-height: 48px; margin: 0; }
+    main.player-mode #backToResults { position: absolute; z-index: 2; left: 8px; top: 8px; min-height: 48px; margin: 0; background: rgba(35,35,35,.92); }
     .secondary { background: #333; }
     [hidden] { display: none !important; }
     @media (min-width: 601px) { body { width: 600px; min-height: 600px; } main { width: 600px; min-height: 600px; } }
@@ -85,6 +85,9 @@
     const searchButton = document.querySelector('#searchButton');
     const rememberedQueryKey = 'rayban-youtube-last-query';
     let rememberedQuery = '';
+    let autoSearchTimer = 0;
+    let lastSearchStartedQuery = '';
+    let lastSearchStartedAt = 0;
     try {
       rememberedQuery = localStorage.getItem(rememberedQueryKey) || '';
       if (rememberedQuery) input.value = rememberedQuery;
@@ -95,9 +98,21 @@
       rememberedQuery = cleanValue;
       try { localStorage.setItem(rememberedQueryKey, cleanValue); } catch (_) {}
     }
-    input.addEventListener('input', () => rememberQuery(input.value));
-    input.addEventListener('change', () => rememberQuery(input.value));
-    input.addEventListener('blur', () => rememberQuery(input.value));
+    input.addEventListener('input', () => {
+      clearTimeout(autoSearchTimer);
+      rememberQuery(input.value);
+    });
+    input.addEventListener('change', scheduleSearchAfterVoiceInput);
+    input.addEventListener('blur', scheduleSearchAfterVoiceInput);
+    input.addEventListener('compositionend', () => rememberQuery(input.value));
+    function scheduleSearchAfterVoiceInput() {
+      rememberQuery(input.value);
+      clearTimeout(autoSearchTimer);
+      autoSearchTimer = setTimeout(() => {
+        const query = input.value.trim() || rememberedQuery;
+        if (query && query !== lastSearchStartedQuery) submitSearch();
+      }, 450);
+    }
     async function openYoutubeSearch(query) {
       const cleanQuery = String(query ?? '').trim() || rememberedQuery;
       if (!cleanQuery) {
@@ -160,6 +175,10 @@
       }
       input.value = query;
       rememberQuery(query);
+      if (query === lastSearchStartedQuery && Date.now() - lastSearchStartedAt < 1200) return;
+      lastSearchStartedQuery = query;
+      lastSearchStartedAt = Date.now();
+      clearTimeout(autoSearchTimer);
       openYoutubeSearch(query);
     }
     searchButton.addEventListener('click', submitSearch);
