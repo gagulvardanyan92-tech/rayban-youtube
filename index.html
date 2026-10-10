@@ -91,8 +91,9 @@
       playerView.hidden = true;
       try {
         const endpoint = new URL('https://www.googleapis.com/youtube/v3/search');
-        endpoint.search = new URLSearchParams({ part: 'snippet', type: 'video', maxResults: '8', q: cleanQuery });
-        const response = await fetch(endpoint, { headers: { 'x-goog-api-key': API_KEY } });
+        // YouTube Data API requires the API key as the `key` query parameter.
+        endpoint.search = new URLSearchParams({ key: API_KEY, part: 'snippet', type: 'video', maxResults: '8', q: cleanQuery });
+        const response = await fetch(endpoint);
         const data = await response.json();
         if (!response.ok) throw new Error(data.error?.message || 'Ошибка YouTube API');
         const videos = (data.items || []).filter(item => item.id?.videoId);
