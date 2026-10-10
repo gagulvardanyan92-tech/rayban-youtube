@@ -75,7 +75,7 @@
     const playerView = document.querySelector('#playerView');
     const playerFrame = document.querySelector('#playerFrame');
     const videoTitle = document.querySelector('#videoTitle');
-    function openYoutubeSearch(query) {
+    async function openYoutubeSearch(query) {
       const cleanQuery = String(query ?? '').trim();
       if (!cleanQuery) {
         status.textContent = 'Сначала скажите или введите запрос.';
