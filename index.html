@@ -33,6 +33,13 @@
     .video-card img { width: 112px; aspect-ratio: 16/9; object-fit: cover; border-radius: 5px; }
     .video-card span { overflow-wrap: anywhere; }
     #playerFrame { width: 100%; aspect-ratio: 16/9; border: 0; border-radius: 8px; margin-top: 10px; background: #111; }
+    main.player-mode { width: 100vw; height: 100vh; min-height: 100vh; padding: 10px; gap: 8px; overflow: hidden; }
+    main.player-mode > header, main.player-mode > form, main.player-mode > .hint,
+    main.player-mode > #resultsView, main.player-mode > .quick { display: none; }
+    main.player-mode > #playerView { display: flex; flex: 1; min-height: 0; flex-direction: column; gap: 8px; }
+    main.player-mode #playerFrame { flex: 1; width: 100%; height: 100%; min-height: 0; aspect-ratio: auto; margin: 0; }
+    main.player-mode #videoTitle { font-size: 16px; line-height: 1.25; }
+    main.player-mode #backToResults { flex: 0 0 auto; min-height: 48px; margin: 0; }
     .secondary { background: #333; }
     [hidden] { display: none !important; }
     @media (min-width: 601px) { body { width: 600px; min-height: 600px; } main { width: 600px; min-height: 600px; } }
@@ -57,7 +64,7 @@
     </section>
     <section id="playerView" hidden>
       <div id="videoTitle"></div>
-      <iframe id="playerFrame" title="Видео YouTube" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>
+      <iframe id="playerFrame" title="Видео YouTube" allow="autoplay; encrypted-media; picture-in-picture" loading="lazy"></iframe>
       <button id="backToResults" class="secondary" type="button">Назад к результатам</button>
     </section>
     <div class="quick" aria-label="Быстрый выбор">
@@ -75,8 +82,24 @@
     const playerView = document.querySelector('#playerView');
     const playerFrame = document.querySelector('#playerFrame');
     const videoTitle = document.querySelector('#videoTitle');
+    const searchButton = document.querySelector('#searchButton');
+    const rememberedQueryKey = 'rayban-youtube-last-query';
+    let rememberedQuery = '';
+    try {
+      rememberedQuery = localStorage.getItem(rememberedQueryKey) || '';
+      if (rememberedQuery) input.value = rememberedQuery;
+    } catch (_) {}
+    function rememberQuery(value) {
+      const cleanValue = String(value || '').trim();
+      if (!cleanValue) return;
+      rememberedQuery = cleanValue;
+      try { localStorage.setItem(rememberedQueryKey, cleanValue); } catch (_) {}
+    }
+    input.addEventListener('input', () => rememberQuery(input.value));
+    input.addEventListener('change', () => rememberQuery(input.value));
+    input.addEventListener('blur', () => rememberQuery(input.value));
     async function openYoutubeSearch(query) {
-      const cleanQuery = String(query ?? '').trim();
+      const cleanQuery = String(query ?? '').trim() || rememberedQuery;
       if (!cleanQuery) {
         status.textContent = 'Сначала скажите или введите запрос.';
         return { error: true, message: 'Не получил поисковый запрос.', next_action: 'Попроси пользователя назвать, что найти на YouTube.' };
@@ -85,6 +108,9 @@
         status.textContent = 'Для поиска нужно добавить ключ YouTube API в файл.';
         return { error: true, message: 'Не настроен ключ YouTube API.' };
       }
+      input.value = cleanQuery;
+      rememberQuery(cleanQuery);
+      searchButton.disabled = true;
       status.textContent = 'Ищу на YouTube: ' + cleanQuery;
       results.replaceChildren();
       resultsView.hidden = false;
@@ -110,9 +136,10 @@
           button.append(img, title);
           button.addEventListener('click', () => {
             videoTitle.textContent = item.snippet.title;
-            playerFrame.src = 'https://www.youtube-nocookie.com/embed/' + encodeURIComponent(item.id.videoId) + '?autoplay=1';
+            playerFrame.src = 'https://www.youtube-nocookie.com/embed/' + encodeURIComponent(item.id.videoId) + '?autoplay=1&playsinline=1&fs=0';
             resultsView.hidden = true;
             playerView.hidden = false;
+            document.querySelector('main').classList.add('player-mode');
           });
           results.append(button);
         });
@@ -121,6 +148,8 @@
       } catch (error) {
         status.textContent = 'Поиск не выполнен: проверьте ключ API и интернет.';
         return { error: true, message: String(error.message || error) };
+      } finally {
+        searchButton.disabled = false;
       }
     }
     form.addEventListener('submit', (event) => {
@@ -132,9 +161,15 @@
       openYoutubeSearch(input.value);
     });
     document.querySelector('#backButton').addEventListener('click', () => { resultsView.hidden = true; status.textContent = ''; });
-    document.querySelector('#backToResults').addEventListener('click', () => { playerFrame.src = ''; playerView.hidden = true; resultsView.hidden = false; });
+    document.querySelector('#backToResults').addEventListener('click', () => {
+      playerFrame.src = '';
+      playerView.hidden = true;
+      resultsView.hidden = false;
+      document.querySelector('main').classList.remove('player-mode');
+    });
     document.querySelectorAll('[data-query]').forEach((button) => button.addEventListener('click', () => {
       input.value = button.dataset.query;
+      rememberQuery(input.value);
       status.textContent = '';
     }));
 
