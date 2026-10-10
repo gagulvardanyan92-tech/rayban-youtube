@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
   <meta name="theme-color" content="#050505">
+  <meta name="mrbd-web-app-capable" content="yes">
   <meta name="description" content="Голосовой поиск видео YouTube на Meta Ray-Ban Display. Когда пользователь просит найти видео на YouTube, вызови youtube_search_videos с его запросом.">
   <title>YouTube для Ray-Ban Display</title>
   <style>
@@ -20,13 +21,20 @@
     input { width: 100%; min-height: 60px; border: 2px solid #777; border-radius: 14px; background: #151515; color: white; padding: 12px 16px; font-size: 21px; outline: none; }
     input:focus { border-color: #fff; }
     button { min-height: 62px; margin-top: 14px; border: 0; border-radius: 14px; padding: 12px 18px; color: #fff; background: #f22; font-size: 21px; font-weight: 700; cursor: pointer; }
-    .search-button { display: grid; place-items: center; width: 100%; min-height: 62px; margin-top: 14px; border-radius: 14px; padding: 12px 18px; color: #fff; background: #f22; font-size: 21px; font-weight: 700; text-decoration: none; }
+    .search-button { display: grid; place-items: center; width: 100%; min-height: 62px; margin-top: 14px; border-radius: 14px; padding: 12px 18px; color: #fff; background: #f22; font-size: 21px; font-weight: 700; }
     button:focus-visible, a:focus-visible { outline: 3px solid #fff; outline-offset: 4px; }
     .hint { color: #aaa; font-size: 15px; line-height: 1.45; margin-top: 22px; }
     .status { min-height: 26px; color: #ffb3b3; font-size: 15px; margin-top: 12px; }
     .quick { display: flex; gap: 10px; margin-top: auto; padding-top: 24px; }
     .quick button { flex: 1; min-height: 54px; margin: 0; background: #262626; font-size: 16px; border: 2px solid #666; }
     .quick button[aria-pressed="true"] { border-color: white; background: #3a3a3a; }
+    #results { margin-top: 12px; display: grid; gap: 8px; }
+    .video-card { display: grid; grid-template-columns: 112px 1fr; gap: 10px; align-items: center; min-height: 80px; padding: 6px; margin: 0; text-align: left; background: #202020; border: 2px solid #666; border-radius: 10px; color: #fff; font-size: 14px; }
+    .video-card img { width: 112px; aspect-ratio: 16/9; object-fit: cover; border-radius: 5px; }
+    .video-card span { overflow-wrap: anywhere; }
+    #playerFrame { width: 100%; aspect-ratio: 16/9; border: 0; border-radius: 8px; margin-top: 10px; background: #111; }
+    .secondary { background: #333; }
+    [hidden] { display: none !important; }
     @media (min-width: 601px) { body { width: 600px; min-height: 600px; } main { width: 600px; min-height: 600px; } }
   </style>
 </head>
@@ -42,29 +50,77 @@
       <button id="searchButton" class="search-button" type="submit">Найти на YouTube</button>
       <div id="status" class="status" role="status" aria-live="polite"></div>
     </form>
-    <p class="hint">Скажите Meta AI: «Найди на YouTube…» — например, «Найди на YouTube джаз для работы».</p>
+    <p class="hint">Введите запрос голосом, нажмите «Найти видео» и выберите результат для просмотра.</p>
+    <section id="resultsView" hidden aria-live="polite">
+      <div id="results"></div>
+      <button id="backButton" class="secondary" type="button">Назад к поиску</button>
+    </section>
+    <section id="playerView" hidden>
+      <div id="videoTitle"></div>
+      <iframe id="playerFrame" title="Видео YouTube" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>
+      <button id="backToResults" class="secondary" type="button">Назад к результатам</button>
+    </section>
     <div class="quick" aria-label="Быстрый выбор">
       <button type="button" data-query="музыка">Музыка</button>
       <button type="button" data-query="новости">Новости</button>
     </div>
   </main>
   <script>
+    const API_KEY = 'AIzaSyADL3_GIV0g-C13UrCL6M00wwwCyUWAflk';
     const form = document.querySelector('#searchForm');
     const input = document.querySelector('#query');
     const status = document.querySelector('#status');
-    function getYoutubeSearchUrl(query) {
-      return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(query);
-    }
+    const resultsView = document.querySelector('#resultsView');
+    const results = document.querySelector('#results');
+    const playerView = document.querySelector('#playerView');
+    const playerFrame = document.querySelector('#playerFrame');
+    const videoTitle = document.querySelector('#videoTitle');
     function openYoutubeSearch(query) {
       const cleanQuery = String(query ?? '').trim();
       if (!cleanQuery) {
         status.textContent = 'Сначала скажите или введите запрос.';
         return { error: true, message: 'Не получил поисковый запрос.', next_action: 'Попроси пользователя назвать, что найти на YouTube.' };
       }
-      const url = getYoutubeSearchUrl(cleanQuery);
-      status.textContent = 'Открываю поиск: ' + cleanQuery;
-      window.location.href = url;
-      return { query: cleanQuery, url, next_action: 'Поиск YouTube открыт. Кратко сообщи пользователю и остановись.' };
+      if (!API_KEY || API_KEY.includes('ВСТАВЬТЕ_СЮДА')) {
+        status.textContent = 'Для поиска нужно добавить ключ YouTube API в файл.';
+        return { error: true, message: 'Не настроен ключ YouTube API.' };
+      }
+      status.textContent = 'Ищу на YouTube: ' + cleanQuery;
+      results.replaceChildren();
+      resultsView.hidden = false;
+      playerView.hidden = true;
+      try {
+        const endpoint = new URL('https://www.googleapis.com/youtube/v3/search');
+        endpoint.search = new URLSearchParams({ part: 'snippet', type: 'video', maxResults: '8', q: cleanQuery });
+        const response = await fetch(endpoint, { headers: { 'x-goog-api-key': API_KEY } });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error?.message || 'Ошибка YouTube API');
+        const videos = (data.items || []).filter(item => item.id?.videoId);
+        if (!videos.length) { status.textContent = 'По запросу видео не найдены.'; return { query: cleanQuery, count: 0 }; }
+        videos.forEach(item => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'video-card';
+          const img = document.createElement('img');
+          img.src = item.snippet.thumbnails?.medium?.url || item.snippet.thumbnails?.default?.url || '';
+          img.alt = '';
+          const title = document.createElement('span');
+          title.textContent = item.snippet.title;
+          button.append(img, title);
+          button.addEventListener('click', () => {
+            videoTitle.textContent = item.snippet.title;
+            playerFrame.src = 'https://www.youtube-nocookie.com/embed/' + encodeURIComponent(item.id.videoId) + '?autoplay=1';
+            resultsView.hidden = true;
+            playerView.hidden = false;
+          });
+          results.append(button);
+        });
+        status.textContent = 'Выберите видео из списка.';
+        return { query: cleanQuery, count: videos.length, next_action: 'Покажи результаты и предложи выбрать видео.' };
+      } catch (error) {
+        status.textContent = 'Поиск не выполнен: проверьте ключ API и интернет.';
+        return { error: true, message: String(error.message || error) };
+      }
     }
     form.addEventListener('submit', (event) => {
       event.preventDefault();
@@ -74,6 +130,8 @@
       }
       openYoutubeSearch(input.value);
     });
+    document.querySelector('#backButton').addEventListener('click', () => { resultsView.hidden = true; status.textContent = ''; });
+    document.querySelector('#backToResults').addEventListener('click', () => { playerFrame.src = ''; playerView.hidden = true; resultsView.hidden = false; });
     document.querySelectorAll('[data-query]').forEach((button) => button.addEventListener('click', () => {
       input.value = button.dataset.query;
       status.textContent = '';
